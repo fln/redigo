@@ -338,11 +338,6 @@ func (p *Pool) putCommon(err error, c Conn, forceClose bool) error {
 // use of the UpdateMaster method will be in the Dial() method, see the
 // example below.
 //
-// A TestOnReturn function entry point is also supplied. Users are encouraged
-// to put a role test in TestOnReturn to prevent connections that persist
-// through unexpected role changes without fatal errors from making it back
-// into the pool.
-//
 // Active connections will not be impacted by the purge. The user is expected
 // to be aware of this and be able to handle interruptions to the redis
 // connection in the event of a failover, which is _not_ seamless.
@@ -370,13 +365,6 @@ func (p *Pool) putCommon(err error, c Conn, forceClose bool) error {
 //	          return nil
 //	        }
 //	      },
-//	    },
-//	    TestOnReturn : func(c redis.Conn) error {
-//	      if !redis.TestRole(c, "master") {
-//	        return errors.New("Failed role check")
-//	      } else {
-//	        return nil
-//	      }
 //	    },
 //	  }
 //
@@ -406,12 +394,6 @@ func (p *Pool) putCommon(err error, c Conn, forceClose bool) error {
 // SentinelClient should automatically recover once a sentinel returns.
 type SentinelAwarePool struct {
 	Pool
-	// TestOnReturn is a user-supplied function to test a connection before
-	// returning it to the pool. Like TestOnBorrow, TestOnReturn will close the
-	// connection if an error is observed. It is strongly suggested to test the
-	// role of a connection on return, especially if the sentinels in use are
-	// older than 2.8.12.
-	TestOnReturn func(c Conn) error
 
 	masterAddr string
 }
@@ -426,18 +408,8 @@ func (sap *SentinelAwarePool) UpdateMaster(addr string) {
 	}
 }
 
-// Entrypoint for TestOnReturn, any error here causes the connection to be
-// closed instead of being returned to the pool.
-func (sap *SentinelAwarePool) testConn(c Conn) error {
-	err := c.Err()
-	if err != nil {
-		return err
-	}
-	return sap.TestOnReturn(c)
-}
-
 func (sap *SentinelAwarePool) put(c Conn, forceClose bool) error {
-	err := sap.testConn(c)
+	err := c.Err()
 	return sap.putCommon(err, c, forceClose)
 }
 

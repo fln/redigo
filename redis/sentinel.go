@@ -284,43 +284,17 @@ func (sc *SentinelClient) Receive() (reply interface{}, err error) {
 
 // GetRole is a convenience function supplied to query an instance (master or
 // slave) for its role. It attempts to use the ROLE command introduced in
-// redis 2.8.12. Failing this, the INFO replication command is used instead.
-//
-// If it is known that the cluster is older than 2.8.12, GetReplicationRole
-// should be used instead, as this bypasses an extraneous ROLE command.
+// redis 2.8.12.
 //
 // It is recommended by the redis client guidelines to test the role of any
-// newly established connection before use. Additionally, if sentinels in use
-// are older than 2.8.12, they will not force clients to reconnect on role
-// change; use of long-lived connections in an environment like this (for
-// example, when using the pool) should involve periodic role testing to
-// protect against unexpected changes. See the SentinelAwarePool example for
-// details.
+// newly established connection before use.
 func GetRole(c Conn) (string, error) {
-	res, err := c.Do("ROLE")
-
-	rres, ok := res.([]interface{})
-	if err == nil && ok {
-		return String(rres[0], nil)
+	res, err := Values(c.Do("ROLE"))
+	if err != nil {
+		return "", err
 	}
-	return GetReplicationRole(c)
-}
 
-// Queries the role of a connected redis instance by checking the output of the
-// INFO replication section. GetRole should be used if the redis instance
-// is sufficiently new to support it.
-func GetReplicationRole(c Conn) (string, error) {
-	res, err := String(c.Do("INFO", "replication"))
-	if err == nil {
-		sres := strings.Split(res, "\r\n")
-		for _, s := range sres {
-			si := strings.Split(s, ":")
-			if si[0] == "role" {
-				return si[1], nil
-			}
-		}
-	}
-	return "", err
+	return String(res[0], nil)
 }
 
 // TestRole wraps GetRole in a test to verify if the role matches an expected
